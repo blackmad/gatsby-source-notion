@@ -1,0 +1,10 @@
+node_modules
+.eslintrc.json
+.husky/
+.jestrc.json
+.lintstagedrc.json
+.npmignore
+.prettierrc.json
+lib/
+tsconfig.build.json
+tsconfig.json
