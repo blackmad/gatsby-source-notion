@@ -101,12 +101,125 @@ export function math(block: NotionAPIRichText): NotionAPIRichText {
  * @returns its url
  */
 export function image(
-  image: Extract<NotionAPIBlock, { type: 'image' }>['image'],
+  image:
+    | Extract<NotionAPIBlock, { type: 'image' }>['image']
+    | Extract<NotionAPIBlock, { type: 'video' }>['video'],
 ): string {
   const caption = texts(image.caption);
   const url = image.type === 'external' ? image.external.url : image.file.url;
 
   return `![${caption}](${url})`;
+}
+
+/**
+ * get the url of an embed property
+ * @param embed an embed property returned from Notion API
+ * @returns formatted html
+ */
+export function embed(
+  embed:
+    | Extract<NotionAPIBlock, { type: 'embed' }>['embed']
+    | Extract<NotionAPIBlock, { type: 'bookmark' }>['bookmark'],
+): string {
+  const caption = texts(embed.caption);
+  const url = embed.url;
+
+  return `<iframe src="${url}" title="${caption}"></iframe>`;
+}
+
+/**
+ * parse and transform icon references from callout blocks from notion
+ * @param icon an icon property returned from Notion API
+ * @returns formatted markdown
+ */
+export function icon(
+  icon: Extract<NotionAPIBlock, { type: 'callout' }>['callout']['icon'],
+): string {
+  if (!icon) {
+    return '';
+  }
+
+  if (icon.type === 'emoji') {
+    return icon.emoji;
+  } else {
+    const url = icon.type === 'external' ? icon.external.url : icon.file.url;
+
+    return `![${icon.type}](${url})`;
+  }
+}
+
+/**
+ * parse and transform callout blocks from notion
+ * @param callout an callout property returned from Notion API
+ * @returns formatted markdown
+ */
+export function callout(
+  callout: Extract<NotionAPIBlock, { type: 'callout' }>['callout'],
+): string {
+  let accumulator = '';
+  for (let i = 0; i < callout.rich_text.length; i++) {
+    const richText = callout.rich_text[i];
+    const markdownText = text(richText);
+
+    const markdownTextLines = markdownText.split('\n');
+
+    for (const markdownTextLine of markdownTextLines) {
+      if (i === 0 && markdownTextLine === markdownTextLines[0]) {
+        const calloutIcon = icon(callout.icon);
+        // Add the emoji on the first line
+        accumulator += `> ${
+          calloutIcon ? `${calloutIcon} ` : ''
+        }${markdownTextLine}\n`;
+      } else {
+        accumulator += `> ${markdownTextLine}\n`;
+      }
+    }
+
+    // If this isn't the last rich text object in the callout, insert a newline
+    if (i !== callout.rich_text.length - 1) {
+      accumulator += `>\n`;
+    }
+  }
+
+  return accumulator;
+}
+
+/**
+ * return html formatted column_list
+ * @param column_list a column_list property returned from Notion API
+ * @returns its url
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function column_list(
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  column_list: Extract<NotionAPIBlock, { type: 'column_list' }>['column_list'],
+): string {
+  type Column = {
+    object: 'block';
+    type: 'column';
+    column: {
+      children: Block[];
+    };
+  };
+  type ColumnListContents = {
+    children: Column[];
+  };
+
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  console.log({ column_list });
+  // const children = (column_list as unknown as ColumnListContents).children;
+  // const childColumnHtml = children.map((child) => {
+  //   const column = child.column;
+  //   const columnChildren = column.children;
+  //   const markdown = columnChildren.map((block) => parse(block));
+
+  //   return `  <div class="column">${markdown.join('\n')}</div>\n`;
+  // });
+
+  // return `<div class="columns" markdown="1">\n${childColumnHtml.join(
+  //   '',
+  // )}</div>\n`;
+  return '';
 }
 
 /**
@@ -198,6 +311,16 @@ export function parse(block: Block, indent = ''): string | null {
       return `${append(block.child_page.title)}\n`;
     case 'image':
       return `${append(image(block.image))}\n`;
+    case 'video':
+      return `${append(image(block.video))}\n`;
+    case 'embed':
+      return `${append(embed(block.embed))}\n`;
+    case 'callout':
+      return `${append(callout(block.callout))}\n`;
+    case 'bookmark':
+      return `${append(embed(block.bookmark))}\n`;
+    case 'column_list':
+      return `${append(column_list(block.column_list))}\n`;
     case 'unsupported':
     default:
       return null;
